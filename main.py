@@ -1,35 +1,22 @@
 from fastapi import FastAPI, HTTPException, Query
 import requests
 from bs4 import BeautifulSoup
-import random
 
 app = FastAPI(title="Amazon Global Product Scraper API")
-
-USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0"
-]
 
 @app.get("/scrape")
 def scrape_amazon(url: str = Query(..., description="Amazon Ürün Detay Sayfası URL'si")):
     if "amazon." not in url:
         raise HTTPException(status_code=400, detail="Geçersiz Amazon URL'si")
         
-headers = {
-        "User-Agent": random.choice(USER_AGENTS),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1",
-        "Cache-Control": "max-age=0"
-    }
+    # Amazon engelini otomatik aşan ücretsiz proxy köprüsü
+    scraper_api_url = f"https://api.scraperapi.com/?api_key=5be8aefbf500f40d70b77a06f3bdf916&url={url}"
     
     try:
-        response = requests.get(url, headers=headers, timeout=10)
+        # İstek doğrudan ScraperAPI üzerinden gidiyor, Amazon botu algılayamıyor
+        response = requests.get(scraper_api_url, timeout=20)
         if response.status_code != 200:
-            return {"status": "error", "message": f"Amazon engelledi veya sayfa bulunamadı. Kod: {response.status_code}"}
+            return {"status": "error", "message": f"Proxy sunucusu yanıt vermedi. Kod: {response.status_code}"}
             
         soup = BeautifulSoup(response.content, "html.parser")
         
@@ -37,16 +24,17 @@ headers = {
         title_el = soup.find("span", {"id": "productTitle"})
         title = title_el.get_text().strip() if title_el else "Bulunamadı"
         
-        # # Fiyat Çıkarma (Amazon.com.tr Uyumlu Geliştirilmiş Seçici)
+        # # Fiyat Çıkarma (Geliştirilmiş Kombinasyon)
         price = "Bulunamadı"
-        price_span = soup.find("span", {"class": "a-price"})
         
+        # 1. Yöntem: Standart bütünleşik fiyat
+        price_span = soup.find("span", {"class": "a-price"})
         if price_span:
             offscreen = price_span.find("span", {"class": "a-offscreen"})
             if offscreen:
                 price = offscreen.get_text().strip()
         
-        # Eğer hala bulunamadıysa Amazon.com.tr'nin ayrık tam/kuruş etiketlerini birleştir
+        # 2. Yöntem: Amazon.com.tr tam ve kuruş etiketlerini birleştirme
         if price == "Bulunamadı":
             whole = soup.find("span", {"class": "a-price-whole"})
             fraction = soup.find("span", {"class": "a-price-fraction"})
@@ -54,6 +42,12 @@ headers = {
                 whole_text = whole.get_text().strip().replace(",", "").replace(".", "")
                 fraction_text = fraction.get_text().strip() if fraction else "00"
                 price = f"{whole_text},{fraction_text} TL"
+                
+        # 3. Yöntem: Alternatif fiyat alanı
+        if price == "Bulunamadı":
+            alt_price = soup.find("span", {"id": "priceblock_ourprice"}) or soup.find("span", {"id": "priceblock_dealprice"})
+            if alt_price:
+                price = alt_price.get_text().strip()
         
         # # Stok Durumu Çıkarma
         availability_el = soup.find("div", {"id": "availability"})
@@ -69,7 +63,7 @@ headers = {
             "status": "success",
             "data": {
                 "title": title,
-                "price": price,
+                "price": price if price != "Bulunamadı" else "",
                 "stock_status": stock,
                 "rating": rating
             }
