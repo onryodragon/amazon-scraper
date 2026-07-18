@@ -18,7 +18,7 @@ def scrape_amazon(url: str = Query(..., description="Amazon Ürün Detay Sayfas�
         
     headers = {
         "User-Agent": random.choice(USER_AGENTS),
-        "Accept-Language": "en-US,en;q=0.9"
+        "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7"
     }
     
     try:
@@ -28,21 +28,35 @@ def scrape_amazon(url: str = Query(..., description="Amazon Ürün Detay Sayfas�
             
         soup = BeautifulSoup(response.content, "html.parser")
         
-        # Başlık Çıkarma
+        # # Başlık Çıkarma
         title_el = soup.find("span", {"id": "productTitle"})
         title = title_el.get_text().strip() if title_el else "Bulunamadı"
         
-        # Fiyat Çıkarma
-        price_el = soup.find("span", {"class": "a-offscreen"})
-        price = price_el.get_text().strip() if price_el else "Bulunamadı"
+        # # Fiyat Çıkarma (Amazon.com.tr Uyumlu Geliştirilmiş Seçici)
+        price = "Bulunamadı"
+        price_span = soup.find("span", {"class": "a-price"})
         
-        # Stok Durumu Çıkarma
+        if price_span:
+            offscreen = price_span.find("span", {"class": "a-offscreen"})
+            if offscreen:
+                price = offscreen.get_text().strip()
+        
+        # Eğer hala bulunamadıysa Amazon.com.tr'nin ayrık tam/kuruş etiketlerini birleştir
+        if price == "Bulunamadı":
+            whole = soup.find("span", {"class": "a-price-whole"})
+            fraction = soup.find("span", {"class": "a-price-fraction"})
+            if whole:
+                whole_text = whole.get_text().strip().replace(",", "").replace(".", "")
+                fraction_text = fraction.get_text().strip() if fraction else "00"
+                price = f"{whole_text},{fraction_text} TL"
+        
+        # # Stok Durumu Çıkarma
         availability_el = soup.find("div", {"id": "availability"})
         stock = "In Stock"
         if availability_el and "out of stock" in availability_el.get_text().lower():
             stock = "Out of Stock"
             
-        # Puan Çıkarma
+        # # Puan Çıkarma
         rating_el = soup.find("span", {"class": "a-icon-alt"})
         rating = rating_el.get_text().strip() if rating_el else "Bulunamadı"
         
@@ -56,4 +70,4 @@ def scrape_amazon(url: str = Query(..., description="Amazon Ürün Detay Sayfas�
             }
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"status": "error", "message": str(e)}
