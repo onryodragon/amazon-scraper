@@ -72,7 +72,7 @@ def scrape_amazon(url: str = Query(..., description="Amazon Ürün Detay Sayfas�
 @app.get("/viral-senaryo")
 def get_viral_script(url: str):
     # Önce kendi iç fonksiyonumuzla Amazon'dan veriyi çekiyoruz
-    product_data = scrape_amazon_product(url) 
+    product_data = scrape_amazon(url) 
     if not product_data or product_data.get("status") != "success":
         return {"status": "error", "message": "Ürün verileri çekilemedi."}
     
