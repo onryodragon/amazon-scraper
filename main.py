@@ -16,9 +16,14 @@ def scrape_amazon(url: str = Query(..., description="Amazon Ürün Detay Sayfas�
     if "amazon." not in url:
         raise HTTPException(status_code=400, detail="Geçersiz Amazon URL'si")
         
-    headers = {
+headers = {
         "User-Agent": random.choice(USER_AGENTS),
-        "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7"
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+        "Cache-Control": "max-age=0"
     }
     
     try:
