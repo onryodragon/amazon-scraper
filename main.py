@@ -11,7 +11,6 @@ def scrape_amazon(url: str = Query(..., description="Amazon Ürün Detay Sayfas�
         raise HTTPException(status_code=400, detail="Geçersiz Amazon URL'si")
         
     try:
-        # Amazon engelini sıfır maliyetle aşan Google Translate köprüsü
         encoded_url = urllib.parse.quote_plus(url)
         google_proxy_url = f"https://translate.google.com/translate?sl=en&tl=tr&u={encoded_url}"
         
@@ -26,14 +25,17 @@ def scrape_amazon(url: str = Query(..., description="Amazon Ürün Detay Sayfas�
         title_el = soup.find("span", {"id": "productTitle"})
         title = title_el.get_text().strip() if title_el else "Bulunamadı"
         
-        # # Fiyat Çıkarma
+        # # Gelişmiş Fiyat Çıkarma (Google Translate Uyumlu)
         price = "Bulunamadı"
+        
+        # 1. Yöntem: Standart fiyat etiketi
         price_span = soup.find("span", {"class": "a-price"})
         if price_span:
             offscreen = price_span.find("span", {"class": "a-offscreen"})
             if offscreen:
                 price = offscreen.get_text().strip()
                 
+        # 2. Yöntem: Bütünleşik tam/kuruş parçaları
         if price == "Bulunamadı":
             whole = soup.find("span", {"class": "a-price-whole"})
             fraction = soup.find("span", {"class": "a-price-fraction"})
@@ -41,6 +43,12 @@ def scrape_amazon(url: str = Query(..., description="Amazon Ürün Detay Sayfas�
                 whole_text = whole.get_text().strip().replace(",", "").replace(".", "")
                 fraction_text = fraction.get_text().strip() if fraction else "00"
                 price = f"{whole_text},{fraction_text} TL"
+
+        # 3. Yöntem: Google Çeviri altındaki ham fiyat renk sınıfları (Kesin Çözüm)
+        if price == "Bulunamadı":
+            color_price = soup.find("span", {"data-a-color": "price"}) or soup.find("span", {"class": "a-color-price"})
+            if color_price:
+                price = color_price.get_text().strip()
         
         # # Stok Durumu Çıkarma
         availability_el = soup.find("div", {"id": "availability"})
