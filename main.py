@@ -6,7 +6,7 @@ import urllib.parse
 app = FastAPI(title="Amazon Global Product Scraper API")
 
 # ScraperAPI'den aldığın ücretsiz API anahtarını buraya yapıştır
-SCRAPER_API_KEY = "BURAYA_KOPYALADIGIN_KEYI_YAZ"
+SCRAPER_API_KEY = "AIzaSyAe8Ww1ApeOxIumWUonsl5cqmlg0JcAtOM"
 
 @app.get("/scrape")
 def scrape_amazon(url: str = Query(..., description="Amazon Ürün Detay Sayfası URL'si")):
@@ -71,15 +71,15 @@ def scrape_amazon(url: str = Query(..., description="Amazon Ürün Detay Sayfas�
         return {"status": "error", "message": str(e)}
 @app.get("/viral-senaryo")
 def get_viral_script(url: str):
-    # Önce kendi iç fonksiyonumuzla Amazon'dan veriyi çekiyoruz
     product_data = scrape_amazon(url) 
-    if not product_data or product_data.get("status") != "success":
+    
+    if not product_data:
         return {"status": "error", "message": "Ürün verileri çekilemedi."}
     
-    data = product_data.get("data", {})
-    title = data.get("title")
-    price = data.get("price")
-    rating = data.get("rating")
+    # Verileri güvenli bir şekilde alıyoruz
+    title = product_data.get("title", "Harika Ürün")
+    price = product_data.get("price", "Fiyat Detayı İçin Tıklayın")
+    rating = product_data.get("rating", "4.5")
 
     # Gemini API Ayarları
     gemini_key = "AIzaSyAe8Ww1ApeOxIumWUonsl5cqmlg0JcAtOM"
