@@ -69,3 +69,50 @@ def scrape_amazon(url: str = Query(..., description="Amazon Ürün Detay Sayfas�
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
+@app.get("/viral-senaryo")
+def get_viral_script(url: str):
+    # Önce kendi iç fonksiyonumuzla Amazon'dan veriyi çekiyoruz
+    product_data = scrape_amazon_product(url) 
+    if not product_data or product_data.get("status") != "success":
+        return {"status": "error", "message": "Ürün verileri çekilemedi."}
+    
+    data = product_data.get("data", {})
+    title = data.get("title")
+    price = data.get("price")
+    rating = data.get("rating")
+
+    # Gemini API Ayarları
+    gemini_key = "AIzaSyAe8Ww1ApeOxIumWUonsl5cqmlg0JcAtOM"
+    gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+    
+    prompt = f"""
+    Sen profesyonel bir sosyal medya içerik üreticisisin ve Instagram Reels algoritmalarını çok iyi biliyorsun. 
+    Sana verdiğim Amazon ürün bilgilerini kullanarak, izlenme süresini (watch time) tavan yaptıracak, merak uyandırıcı, 
+    kancalı (hook) ve tamamen Türkçe bir viral video senaryosu yaz.
+
+    Ürün Bilgileri:
+    - Ürün Adı: {title}
+    - Canlı Fiyatı: {price}
+    - Kullanıcı Puanı: {rating}
+
+    Senaryo Kuralları:
+    1. İlk 3 saniyede izleyiciyi tutacak şok edici bir giriş (Hook) cümlesi olsun.
+    2. Video kesinlikle dikey video formatına (Reels/TikTok) uygun, akıcı bir dille yazılmalı.
+    3. Metin içinde sahne geçişleri için [Ekranda ürünün görseli belirecek], [Fiyat grafiği gelecek] gibi yönetmen notları ekle.
+    4. Videonun sonuna izleyicileri yorum yapmaya zorlayacak bir soru ekle.
+    5. En alta da video için popüler 5 adet hashtag (#) ekle.
+    """
+
+    import requests
+    headers = {"Content-Type": "application/json"}
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+
+    try:
+        response = requests.post(gemini_url, json=payload, headers=headers, timeout=20)
+        if response.status_code == 200:
+            text_output = response.json()['candidates'][0]['content']['parts'][0]['text']
+            return {"status": "success", "viral_script": text_output}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+    
+    return {"status": "error", "message": "Yapay zeka yanıt vermedi."}
