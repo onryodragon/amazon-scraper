@@ -2,9 +2,11 @@ from fastapi import FastAPI, HTTPException, Query
 import requests
 from bs4 import BeautifulSoup
 import urllib.parse
-import re
 
 app = FastAPI(title="Amazon Global Product Scraper API")
+
+# ScraperAPI'den aldığın ücretsiz API anahtarını buraya yapıştır
+SCRAPER_API_KEY = "BURAYA_KOPYALADIGIN_KEYI_YAZ"
 
 @app.get("/scrape")
 def scrape_amazon(url: str = Query(..., description="Amazon Ürün Detay Sayfası URL'si")):
@@ -12,25 +14,26 @@ def scrape_amazon(url: str = Query(..., description="Amazon Ürün Detay Sayfas�
         raise HTTPException(status_code=400, detail="Geçersiz Amazon URL'si")
         
     try:
-        encoded_url = urllib.parse.quote_plus(url)
-        google_proxy_url = f"https://translate.google.com/translate?sl=en&tl=tr&u={encoded_url}"
+        # url_encode işlemi yapıyoruz
+        encoded_amazon_url = urllib.parse.quote_plus(url)
         
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
+        # render=true diyerek ScraperAPI'ye arka planda gerçek Chrome tarayıcı açtırıyoruz
+        proxy_url = f"https://api.scraperapi.com/?api_key={SCRAPER_API_KEY}&url={encoded_amazon_url}&render=true"
         
-        response = requests.get(google_proxy_url, headers=headers, timeout=15)
-        html_content = response.text
-        soup = BeautifulSoup(html_content, "html.parser")
+        # Gerçek tarayıcı yüklendiği için timeout süresini biraz uzun tutuyoruz (20 saniye)
+        response = requests.get(proxy_url, timeout=30)
+        
+        if response.status_code != 200:
+            return {"status": "error", "message": f"Tarayıcı sunucusu hata döndürdü. Kod: {response.status_code}"}
+            
+        soup = BeautifulSoup(response.content, "html.parser")
         
         # # Başlık Çıkarma
         title_el = soup.find("span", {"id": "productTitle"})
         title = title_el.get_text().strip() if title_el else "Bulunamadı"
         
-        # # Fiyat Çıkarma (Gelişmiş Seçiciler + Regex Kombinasyonu)
+        # # Fiyat Çıkarma (Tarayıcı yüklendiği için artık bu etiket kesinlikle var)
         price = "Bulunamadı"
-        
-        # 1. Klasik HTML Seçicileri Deneyelim
         price_span = soup.find("span", {"class": "a-price"})
         if price_span:
             offscreen = price_span.find("span", {"class": "a-offscreen"})
@@ -38,22 +41,13 @@ def scrape_amazon(url: str = Query(..., description="Amazon Ürün Detay Sayfas�
                 price = offscreen.get_text().strip()
                 
         if price == "Bulunamadı":
-            color_price = soup.find("span", {"data-a-color": "price"}) or soup.find("span", {"class": "a-color-price"})
-            if color_price:
-                price = color_price.get_text().strip()
-
-        # 2. JavaScript Bloklarından Regex ile Çekme (Kesin Çözüm)
-        if price == "Bulunamadı" or price == "":
-            # Sayfa içindeki fiyat kalıplarını ara (Örn: 1.250,00 TL veya 1250.00)
-            price_match = re.search(r'"priceAmount"\s*:\s*([\d\.]+)', html_content)
-            if price_match:
-                price = f"{price_match.group(1)} TL"
-            else:
-                # Alternatif başka bir kalıp dene
-                price_match_alt = re.search(r'"buyingPrice"\s*:\s*([\d\.]+)', html_content)
-                if price_match_alt:
-                    price = f"{price_match_alt.group(1)} TL"
-
+            whole = soup.find("span", {"class": "a-price-whole"})
+            fraction = soup.find("span", {"class": "a-price-fraction"})
+            if whole:
+                whole_text = whole.get_text().strip().replace(",", "").replace(".", "")
+                fraction_text = fraction.get_text().strip() if fraction else "00"
+                price = f"{whole_text},{fraction_text} TL"
+        
         # # Stok Durumu Çıkarma
         availability_el = soup.find("div", {"id": "availability"})
         stock = "In Stock"
