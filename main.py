@@ -6,7 +6,7 @@ import urllib.parse
 app = FastAPI(title="Amazon Global Product Scraper API")
 
 # ScraperAPI'den aldığın ücretsiz API anahtarını buraya yapıştır
-SCRAPER_API_KEY = "AIzaSyAe8Ww1ApeOxIumWUonsl5cqmlg0JcAtOM"
+SCRAPER_API_KEY = "BURAYA_GERÇEK_SCRAPERAPI_ANAHTARINI_YAPIŞTIR"
 
 @app.get("/scrape")
 def scrape_amazon(url: str = Query(..., description="Amazon Ürün Detay Sayfası URL'si")):
@@ -82,7 +82,7 @@ def get_viral_script(url: str):
     rating = product_data.get("rating", "4.5")
 
     # Gemini API Ayarları
-    gemini_key = "AIzaSyAe8Ww1ApeOxIumWUonsl5cqmlg0JcAtOM"
+    gemini_key = "AQ.Ab8RN6KLUZFNX9ztEzMV8m0OT-PjVSxR7fUjZ0LppasB0-KXFQ"
     gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
     
     prompt = f"""
